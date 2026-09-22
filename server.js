@@ -14,8 +14,9 @@ const code=()=>{let c;do{c="FW-"+Math.floor(1000+Math.random()*9000)}while(rooms
 
 const server=http.createServer((req,res)=>{
   res.setHeader("Access-Control-Allow-Origin","*");
-  if(req.url==="/health"){res.writeHead(200,{"content-type":"application/json"});return res.end(JSON.stringify({ok:true,rooms:rooms.size}));}
-  if(req.url==="/" || req.url==="/index.html"){
+  const pathname=new URL(req.url||"/","http://localhost").pathname;
+  if(pathname==="/health"){res.writeHead(200,{"content-type":"application/json"});return res.end(JSON.stringify({ok:true,rooms:rooms.size}));}
+  if(pathname==="/" || pathname==="/index.html"){
     const file=path.join(__dirname,"index.html");
     fs.readFile(file,(err,data)=>{
       if(err){res.writeHead(500,{"content-type":"text/plain; charset=utf-8"});return res.end("No se pudo cargar Fortress Wars");}
