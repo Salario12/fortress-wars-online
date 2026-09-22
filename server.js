@@ -1,9 +1,13 @@
 import http from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import crypto from "crypto";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const PORT=process.env.PORT||3000;
 const rooms=new Map();
+const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const send=(ws,data)=>{if(ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify(data));};
 const broadcast=(room,data,except=null)=>room.players.forEach(p=>{if(p.ws!==except)send(p.ws,data)});
 const code=()=>{let c;do{c="FW-"+Math.floor(1000+Math.random()*9000)}while(rooms.has(c));return c};
@@ -11,7 +15,16 @@ const code=()=>{let c;do{c="FW-"+Math.floor(1000+Math.random()*9000)}while(rooms
 const server=http.createServer((req,res)=>{
   res.setHeader("Access-Control-Allow-Origin","*");
   if(req.url==="/health"){res.writeHead(200,{"content-type":"application/json"});return res.end(JSON.stringify({ok:true,rooms:rooms.size}));}
-  res.writeHead(200,{"content-type":"application/json"});res.end(JSON.stringify({name:"Fortress Wars Online",online:true}));
+  if(req.url==="/" || req.url==="/index.html"){
+    const file=path.join(__dirname,"index.html");
+    fs.readFile(file,(err,data)=>{
+      if(err){res.writeHead(500,{"content-type":"text/plain; charset=utf-8"});return res.end("No se pudo cargar Fortress Wars");}
+      res.writeHead(200,{"content-type":"text/html; charset=utf-8","cache-control":"no-cache"});
+      res.end(data);
+    });
+    return;
+  }
+  res.writeHead(404,{"content-type":"application/json"});res.end(JSON.stringify({error:"not_found"}));
 });
 const wss=new WebSocketServer({server});
 wss.on("connection",ws=>{
@@ -35,12 +48,8 @@ wss.on("connection",ws=>{
       return;
     }
     const room=player.room&&rooms.get(player.room); if(!room)return;
-    if(m.type==="state"){
-      player.state=m.state||{};
-      return broadcast(room,{type:"state",playerId:player.id,state:player.state},ws);
-    }
-    if(["shoot","ability","hit","ready","restart"].includes(m.type))
-      broadcast(room,{...m,playerId:player.id},ws);
+    if(m.type==="state"){player.state=m.state||{};return broadcast(room,{type:"state",playerId:player.id,state:player.state},ws);}
+    if(["shoot","ability","hit","ready","restart"].includes(m.type)) broadcast(room,{...m,playerId:player.id},ws);
   });
   ws.on("close",()=>leave(player));
 });
